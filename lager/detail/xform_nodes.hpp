@@ -67,7 +67,7 @@ initial_value<ValueT> get_initial_value(Xform&& xform, const std::tuple<ParentPt
         if constexpr (std::is_default_constructible<ValueT>::value) {
             return {ValueT{}, true};
         } else {
-            LAGER_THROW();
+            LAGER_RETHROW;
         }
     }
 };
