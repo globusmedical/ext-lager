@@ -67,10 +67,16 @@ endif()
 
 install(TARGETS lager EXPORT LagerConfig)
 
+# reader_node guards its value slot with std::shared_mutex, so consumers of the
+# header need the thread library too, not just the tests and examples below.
+# A plain flag rather than Threads::Threads keeps LagerConfig free of an
+# imported target the consumer would have to resolve itself.
+find_package(Threads REQUIRED)
+target_link_libraries(lager INTERFACE ${CMAKE_THREAD_LIBS_INIT})
+
 # requirements for tests and examples
 if (lager_BUILD_TESTS OR lager_BUILD_EXAMPLES)
   find_package(Boost 1.56 COMPONENTS system REQUIRED)
-  find_package(Threads REQUIRED)
   find_package(Immer REQUIRED)
   find_package(Zug REQUIRED)
 endif()
