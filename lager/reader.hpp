@@ -21,10 +21,34 @@
 
 #include <zug/meta/value_type.hpp>
 
+#include <memory>
+#include <type_traits>
+
 namespace lager {
 
 template <typename NodeT>
 class cursor_base;
+
+namespace detail {
+
+/*!
+ * Temporary handed out by `reader_mixin::operator->()` so that
+ * `reader->member` keeps working now that `get()` returns the value by copy.
+ * The proxy owns the copy and lives until the end of the full expression it
+ * appears in.
+ *
+ * @warning Never bind a reference to `reader->member`: the proxy holding the
+ * member is destroyed at the end of the declaration.  Bind a value, or bind a
+ * reference to `*reader` instead, which is lifetime extended.
+ */
+template <typename T>
+struct arrow_proxy
+{
+    T value;
+    const T* operator->() const { return std::addressof(value); }
+};
+
+} // namespace detail
 
 //! @defgroup cursors
 //! @{
@@ -34,7 +58,11 @@ struct reader_mixin
 {
     decltype(auto) get() const { return node_()->last(); }
     decltype(auto) operator*() const { return get(); }
-    decltype(auto) operator->() const { return &get(); }
+    auto operator->() const
+    {
+        using value_t = std::decay_t<decltype(node_()->last())>;
+        return detail::arrow_proxy<value_t>{get()};
+    }
 
     template <typename T>
     auto operator[](T&& t) const

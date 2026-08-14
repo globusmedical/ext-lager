@@ -59,7 +59,7 @@ struct qt_helper
 #define LAGER_QT_READER(type, name)                                            \
     ::lager::reader<type> LAGER_QT(name);                                      \
     Q_PROPERTY(type name READ name NOTIFY name##Changed)                       \
-    const type& name() const { return LAGER_QT(name).get(); }                  \
+    type name() const { return LAGER_QT(name).get(); }                         \
     LAGER_QT_SIGNAL_DETAIL(type, name)                                         \
     /**/
 
@@ -70,7 +70,7 @@ struct qt_helper
 #define LAGER_QT_CURSOR(type, name)                                            \
     ::lager::cursor<type> LAGER_QT(name);                                      \
     Q_PROPERTY(type name READ name WRITE set##name NOTIFY name##Changed)       \
-    const type& name() const { return LAGER_QT(name).get(); }                  \
+    type name() const { return LAGER_QT(name).get(); }                         \
     void set##name(const type& val) { LAGER_QT(name).set(val); }               \
     LAGER_QT_SIGNAL_DETAIL(type, name)                                         \
     /**/

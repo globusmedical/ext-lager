@@ -47,6 +47,7 @@
 #include <algorithm>
 #include <functional>
 #include <memory>
+#include <shared_mutex>
 #include <vector>
 
 namespace lager {
@@ -146,8 +147,28 @@ public:
     virtual void recompute() = 0;
     virtual void refresh()   = 0;
 
+    /*!
+     * Returns the uncommitted value of the node.
+     *
+     * @warning May only be called from the thread that drives propagation, the
+     * one running the event loop of the store this node belongs to.  It hands
+     * out a reference to a slot that `push_down()` writes on that thread.
+     */
     const value_type& current() const { return current_; }
-    const value_type& last() const { return last_; }
+
+    /*!
+     * Returns a copy of the last committed value of the node.
+     *
+     * May be called from any thread.  The copy is taken under a lock that
+     * excludes the commit performed by `send_down()`, so a reader on another
+     * thread always observes a fully constructed value instead of one that is
+     * being assigned over.
+     */
+    value_type last() const
+    {
+        std::shared_lock<std::shared_mutex> lock{last_mutex_};
+        return last_;
+    }
 
     void link(std::weak_ptr<reader_node_base> child)
     {
@@ -173,7 +194,14 @@ public:
     {
         recompute();
         if (needs_send_down_) {
-            last_            = current_;
+            {
+                // Held for the assignment only.  Nothing is called into while
+                // the lock is taken, in particular no child node and no
+                // observer, so only one node lock is ever held at a time and no
+                // lock ordering can arise.
+                std::unique_lock<std::shared_mutex> lock{last_mutex_};
+                last_ = current_;
+            }
             needs_send_down_ = false;
             needs_notify_    = true;
             for (auto& wchild : children_) {
@@ -193,6 +221,8 @@ public:
             notifying_guard_t notifying_guard(notifying_);
             bool garbage = false;
 
+            // No lock: last_ is only written by send_down() on this same
+            // thread, and readers on other threads only read it.
             observers_(last_);
             for (size_t i = 0, size = children_.size(); i < size; ++i) {
                 if (auto child = children_[i].lock()) {
@@ -222,6 +252,7 @@ private:
 
     value_type current_;
     value_type last_;
+    mutable std::shared_mutex last_mutex_;
     std::vector<std::weak_ptr<reader_node_base>> children_;
     signal_type observers_;
 
